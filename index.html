@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Squishy Simulator — Only for Bea ♡</title>
+<meta name="theme-color" content="#fff5f8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Squishy Simulator">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="./manifest.webmanifest">
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+        /* System fonts only — offline friendly */
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                     "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    }
+
+    html, body {
+        height: 100%;
+        overflow: hidden;
+        background: linear-gradient(180deg, #fff5f8 0%, #ffe4ec 50%, #ffd0e0 100%);
+        user-select: none;
+        touch-action: none;
+    }
+
+    :root {
+        /* Bright aqua that blends with pink + blue background */
+        --cyan-main:   #00b8c9;
+        --cyan-soft:   #ff80b0;
+        --cyan-dark:   #0097a7;
+        --cyan-light:  #b8f0f6;
+
+        --pink-mid:    #d66090;
+        --pink-bright: #ff80b0;
+    }
+
+    #topBar {
+        position: fixed; top: 0; left: 0; right: 0;
+        padding: 18px 26px;
+        display: flex; justify-content: space-between; align-items: center;
+        z-index: 10; pointer-events: none;
+    }
+
+    #countLabel {
+        font-size: 24px;
+        font-weight: 800;
+        color: var(--cyan-main);
+        letter-spacing: -0.3px;
+    }
+
+    #rankLabel {
+        font-size: 20px;
+        font-weight: 800;
+        color: var(--cyan-main);
+        letter-spacing: -0.2px;
+    }
+
+    #dedication {
+        position: fixed; top: 95px; left: 0; right: 0;
+        text-align: center;
+        font-size: 24px;
+        font-weight: 800;
+        color: var(--cyan-soft);
+        letter-spacing: 3px;
+        z-index: 10; pointer-events: none;
+    }
+
+    #bottomHint {
+        position: fixed; bottom: 22px; left: 0; right: 0;
+        text-align: center;
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--pink-mid);
+        z-index: 10; pointer-events: none;
+        padding: 0 20px;
+        letter-spacing: 0.2px;
+    }
+
+    #zoneHint {
+        position: fixed; bottom: 52px; left: 0; right: 0;
+        text-align: center;
+        font-size: 22px;
+        font-weight: 800;
+        color: var(--pink-bright);
+        z-index: 10; pointer-events: none;
+        min-height: 28px;
+        letter-spacing: 0.3px;
+    }
+
+    #resetBtn {
+        position: fixed; top: 50px; right: 20px;
+        padding: 8px 16px;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        color: var(--cyan-dark);
+        background: rgba(255, 255, 255, 0.75);
+        border: 2px solid rgba(0, 184, 201, 0.5);
+        border-radius: 22px;
+        cursor: pointer;
+        z-index: 20;
+        opacity: 0.7;
+        transition: opacity 0.2s, background 0.2s, color 0.2s;
+    }
+    #resetBtn:hover {
+        opacity: 1;
+        background: var(--cyan-light);
+        color: #005a66;
+    }
+
+    #popup {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        pointer-events: none;
+        z-index: 100;
+        opacity: 0;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        will-change: transform, opacity;
+    }
+    #popupText {
+        font-size: 64px;
+        font-weight: 900;
+        letter-spacing: -1.5px;
+        background: linear-gradient(180deg, #ff80b0 0%, #d64090 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        line-height: 1.05;
+    }
+    #popupSub {
+        font-size: 20px;
+        font-weight: 600;
+        color: #b0508a;
+        margin-top: 4px;
+        letter-spacing: 1px;
+    }
+
+    canvas {
+        display: block; position: fixed; top: 0; left: 0;
+        width: 100%; height: 100%;
+        cursor: grab; touch-action: none;
+    }
+    canvas:active { cursor: grabbing; }
+</style>
+</head>
+<body>
+
+<div id="topBar">
+    <div id="countLabel">Squishes: 0</div>
+    <div id="rankLabel">Rank: Newbie</div>
+</div>
+
+<div id="dedication">♡  only for bea  ♡</div>
+<div id="zoneHint"></div>
+<button id="resetBtn">reset</button>
+
+<div id="popup">
+    <div id="popupText"></div>
+    <div id="popupSub"></div>
+</div>
+
+<canvas id="game"></canvas>
+
+<div id="bottomHint">Tap different parts of the onigiri — each has its own reaction!</div>
+
+<script>
+// =============================================
+//   ONIGIRI SQUISHY SIMULATOR - for Bea ♡
+// =============================================
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d', { alpha: false });
+const countLabel = document.getElementById('countLabel');
+const rankLabel = document.getElementById('rankLabel');
+const zoneHint = document.getElementById('zoneHint');
+const resetBtn = document.getElementById('resetBtn');
+const popup = document.getElementById('popup');
+const popupText = document.getElementById('popupText');
+const popupSub = document.getElementById('popupSub');
+
+let W = 0, H = 0;
+let DPR = Math.min(2, window.devicePixelRatio || 1);
+
+function resize() {
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ==================== BACKGROUND ====================
+const bgImage = new Image();
+let bgImageLoaded = false;
+bgImage.onload = () => { bgImageLoaded = true; };
+bgImage.onerror = () => { bgImageLoaded = false; };
+bgImage.src = 'bga.jpg';
+
+// ==================== SAVE ====================
+const STORAGE_KEY = 'bea_squishy_count';
+let pendingSave = false;
+
+function loadCount() {
+    try {
+        const v = localStorage.getItem(STORAGE_KEY);
+        return v ? parseInt(v, 10) || 0 : 0;
+    } catch (e) { return 0; }
+}
+function saveCountNow() {
+    try {
+        localStorage.setItem(STORAGE_KEY, String(squishCount));
+        pendingSave = false;
+    } catch (e) {}
+}
+function saveCount() {
+    if (pendingSave) return;
+    pendingSave = true;
+    setTimeout(saveCountNow, 1000);
+}
+window.addEventListener('beforeunload', saveCountNow);
+
+// ==================== STATE ====================
+let squishCount = loadCount();
+let pressed = false;
+let pressedZone = null;
+
+const EASE_GLOBAL = 0.38;
+const EASE_ZONE = 0.42;
+
+const zones = {
+    top:     { sx: 0, sy: 0, tx: 0, ty: 0 },
+    left:    { sx: 0, sy: 0, tx: 0, ty: 0 },
+    right:   { sx: 0, sy: 0, tx: 0, ty: 0 },
+    seaweed: { sx: 0, sy: 0, tx: 0, ty: 0 },
+    cheekL:  { sx: 0, sy: 0, tx: 0, ty: 0 },
+    cheekR:  { sx: 0, sy: 0, tx: 0, ty: 0 }
+};
+
+let globalSquishX = 0, globalSquishY = 0;
+let targetSquishX = 0, targetSquishY = 0;
+
+let idlePhase = 0;
+let idleBounce = 0;
+let idleTilt = 0;
+let squashWave = 0;
+
+let faceExpression = 'normal';
+let expressionTimer = 0;
+
+let eyeBlink = 1.0;
+let eyeBlinkTimer = 0;
+let nextBlink = 2000 + Math.random() * 3000;
+let blinkClosing = true;
+
+const MAX_PARTICLES = 80;
+const MAX_HEARTS = 30;
+
+const particles = [];
+const hearts = [];
+
+const sparkles = [];
+for (let i = 0; i < 18; i++) {
+    sparkles.push({
+        x: Math.random(), y: Math.random(),
+        size: 1.5 + Math.random() * 2,
+        speed: 0.15 + Math.random() * 0.3,
+        phase: Math.random() * Math.PI * 2,
+        alpha: 0.2 + Math.random() * 0.5
+    });
+}
+
+let cx, cy;
+function updateCenter() { cx = W / 2; cy = H / 2 + 20; }
+
+// ==================== ONIGIRI GEOMETRY ====================
+const BODY_W = 260;
+const BODY_H = 220;
+
+function getCurrentSize() {
+    const scaleX = 1 + globalSquishX + squashWave;
+    const scaleY = 1 + globalSquishY - squashWave * 0.5;
+    return { w: BODY_W * scaleX, h: BODY_H * scaleY, scaleX, scaleY };
+}
+
+// ==================== FLIRTY LINES ====================
+const flirtyLines = {
+    top: [
+        "boop! ◠‿◠", "you're so cute ♡", "hi cutie ~", "my favorite face ♡",
+        "got your nose!", "you're my favorite ♡", "kyaa~ ◕‿◕", "i miss you ♡", "my bea ♡"
+    ],
+    left: [
+        "squish left ◕‿◕", "so soft, huh?", "just like your hugs ♡", "left side! ♡",
+        "warm like you ~", "hold me tighter ♡", "this side ♡"
+    ],
+    right: [
+        "squish right ◕‿◕", "right side! ♡", "so squishy ♡", "aww you ~",
+        "this side loves you ♡", "touch me more ♡", "my heart ♡"
+    ],
+    seaweed: [
+        "nom nom nom ❤", "feed me more ♡", "tasty, right?", "want a bite? ♡",
+        "onigiri love ❤", "yummy time ~", "tummy ♡"
+    ],
+    cheekL: [
+        "cheek poke! ♡", "so blushy ♡", "you make me blush ~", "kiss me here ♡",
+        "aww ◕‿◕", "hehe ♡"
+    ],
+    cheekR: [
+        "cheek poke! ♡", "another one? ♡", "blush blush ~", "smooch? ♡",
+        "you're the sweetest ♡", "my bea ♡"
+    ]
+};
+
+function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+// ==================== RANKS ====================
+function getRank(n) {
+    if (n < 5) return 'Newbie';
+    if (n < 15) return 'Squisher';
+    if (n < 30) return 'Squish Master';
+    if (n < 50) return 'Squish Legend';
+    if (n < 100) return 'Onigiri Queen';
+    if (n < 200) return 'Bea\'s Favorite';
+    if (n < 300) return 'Cutie Squisher';
+    if (n < 500) return 'Bea\'s Sweetheart';
+    if (n < 800) return 'My One and Only';
+    if (n < 1000) return 'Bea\'s Angel';
+    if (n < 1200) return 'Forever Yours';
+    if (n < 1500) return 'Bea\'s Whole World';
+    if (n < 2000) return 'Endlessly Yours';
+    if (n < 3000) return 'Bea\'s Soulmate';
+    if (n < 5000) return 'Beyond the Stars';
+    return 'Bea\'s Everything ♡';
+}
+
+// ==================== MILESTONE POPUP ====================
+let lastMilestoneShown = Math.floor(squishCount / 100);
+
+const milestoneMessages = [
+    { text: 'i love you',     sub: 'so much ♡' },
+    { text: 'i\'m here',      sub: 'always ♡' },
+    { text: 'my bea',         sub: 'hi cutie ♡' },
+    { text: 'forever',        sub: 'me + you ♡' },
+    { text: 'you\'re mine',   sub: 'and i\'m yours ♡' },
+    { text: 'i miss you',     sub: 'come here ♡' },
+    { text: 'hug time',       sub: 'warm hugs ♡' },
+    { text: 'smooch!',        sub: 'mwah ♡' },
+    { text: 'my baby',        sub: 'love you ♡' },
+    { text: 'cutie pie',      sub: 'that\'s you ♡' },
+    { text: 'my heart',       sub: 'beats for you ♡' },
+    { text: 'always',         sub: 'i promise ♡' },
+    { text: 'hi love',        sub: 'thinking of you ♡' },
+    { text: 'you + me',       sub: 'forever ♡' },
+    { text: 'sweetheart',     sub: 'only you ♡' },
+    { text: 'mine mine',      sub: 'all mine ♡' },
+    { text: 'kiss kiss',      sub: 'for you ♡' },
+    { text: 'bea bea',        sub: 'my girl ♡' },
+    { text: 'love bug',       sub: 'you are ♡' },
+    { text: 'snuggle time',   sub: 'come close ♡' },
+    { text: 'sweet girl',     sub: 'you\'re mine ♡' },
+    { text: 'pretty girl',    sub: 'so pretty ♡' },
+    { text: 'i like you',     sub: 'a lot ♡' },
+    { text: 'you\'re enough', sub: 'always ♡' },
+    { text: 'my world',       sub: 'you are ♡' },
+    { text: 'stay with me',   sub: 'please ♡' },
+    { text: 'i got you',      sub: 'always ♡' },
+    { text: 'proud of you',   sub: 'always ♡' },
+    { text: 'so in love',     sub: 'with you ♡' },
+    { text: 'my home',        sub: 'is you ♡' }
+];
+
+let popupAnimationFrame = null;
+
+function showMilestone() {
+    const msg = milestoneMessages[Math.floor(Math.random() * milestoneMessages.length)];
+    popupText.textContent = msg.text;
+    popupSub.textContent = msg.sub;
+
+    const goLeft = Math.random() < 0.5;
+    const startX = 0;
+    const endX = goLeft ? -180 : 180;
+    const endY = -220;
+    const duration = 2200;
+
+    const startTime = performance.now();
+    popup.style.transform = `translate(calc(-50% + ${startX}px), -50%) scale(0.7)`;
+    popup.style.opacity = '0';
+
+    if (popupAnimationFrame) cancelAnimationFrame(popupAnimationFrame);
+
+    function animate(now) {
+        const t = Math.min(1, (now - startTime) / duration);
+        const easeOut = 1 - Math.pow(1 - t, 3);
+        const easeBounce = t < 0.2 ? 1.15 * (t / 0.2) : 1.15 - 0.15 * ((t - 0.2) / 0.8);
+
+        const x = startX + (endX - startX) * easeOut;
+        const y = 0 + (endY - 0) * easeOut;
+        const scale = 0.7 + (easeBounce - 0.7) * Math.min(1, t * 3);
+
+        let opacity;
+        if (t < 0.15) opacity = t / 0.15;
+        else if (t < 0.6) opacity = 1;
+        else opacity = 1 - (t - 0.6) / 0.4;
+
+        popup.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) scale(${scale})`;
+        popup.style.opacity = opacity;
+
+        if (t < 1) {
+            popupAnimationFrame = requestAnimationFrame(animate);
+        } else {
+            popup.style.opacity = '0';
+            popupAnimationFrame = null;
+        }
+    }
+
+    popupAnimationFrame = requestAnimationFrame(animate);
+}
+
+function checkMilestone() {
+    const currentMilestone = Math.floor(squishCount / 100);
+    if (currentMilestone > lastMilestoneShown) {
+        lastMilestoneShown = currentMilestone;
+        showMilestone();
+    }
+}
+
+// ==================== LABELS ====================
+function updateLabels() {
+    countLabel.textContent = 'Squishes: ' + squishCount;
+    rankLabel.textContent = 'Rank: ' + getRank(squishCount);
+}
+
+function incrementSquish() {
+    squishCount++;
+    updateLabels();
+    saveCount();
+    checkMilestone();
+}
+
+let hintTimeout = null;
+function showZoneHint(text) {
+    zoneHint.textContent = text;
+    if (hintTimeout) clearTimeout(hintTimeout);
+    hintTimeout = setTimeout(() => { zoneHint.textContent = ''; }, 1200);
+}
+
+resetBtn.addEventListener('click', () => {
+    if (confirm('Reset your squish count?')) {
+        squishCount = 0;
+        lastMilestoneShown = 0;
+        updateLabels();
+        saveCountNow();
+    }
+});
+
+// ==================== ZONE DETECTION ====================
+function detectZone(mx, my) {
+    const dx = mx - cx;
+    const dy = my - cy;
+
+    if (my > cy + BODY_H * 0.02 && my < cy + BODY_H * 0.45 && Math.abs(dx) < BODY_W * 0.20) {
+        return 'seaweed';
+    }
+
+    const cheekY = cy - BODY_H * 0.05;
+    const cheekOffset = BODY_W * 0.24;
+    if (Math.abs(my - cheekY) < 25 && Math.abs(dx - (-cheekOffset)) < 32) return 'cheekL';
+    if (Math.abs(my - cheekY) < 25 && Math.abs(dx - cheekOffset) < 32) return 'cheekR';
+
+    if (dy < -BODY_H * 0.15) return 'top';
+    if (dx < -BODY_W * 0.15) return 'left';
+    if (dx > BODY_W * 0.15) return 'right';
+
+    return 'top';
+}
+
+function isInOnigiri(mx, my) {
+    const dx = (mx - cx) / (BODY_W / 2 + 20);
+    const dy = (my - cy) / (BODY_H / 2 + 20);
+    return (dx * dx + dy * dy) <= 1.3;
+}
+
+// ==================== INPUT ====================
+function handleDown(x, y) {
+    if (!isInOnigiri(x, y)) return;
+
+    pressed = true;
+    pressedZone = detectZone(x, y);
+
+    targetSquishX = -0.22;
+    targetSquishY = 0.20;
+
+    switch (pressedZone) {
+        case 'top':
+            zones.top.tx = 0; zones.top.ty = 0.30;
+            faceExpression = 'happy';
+            break;
+        case 'left':
+            zones.left.tx = 0.22; zones.left.ty = 0.15;
+            zones.right.tx = -0.15;
+            faceExpression = 'normal';
+            break;
+        case 'right':
+            zones.right.tx = -0.22; zones.right.ty = 0.15;
+            zones.left.tx = 0.15;
+            faceExpression = 'normal';
+            break;
+        case 'seaweed':
+            zones.seaweed.tx = 0; zones.seaweed.ty = 0.38;
+            faceExpression = 'surprised';
+            break;
+        case 'cheekL':
+            zones.cheekL.tx = -0.35; zones.cheekL.ty = 0.15;
+            faceExpression = 'blush';
+            break;
+        case 'cheekR':
+            zones.cheekR.tx = 0.35; zones.cheekR.ty = 0.15;
+            faceExpression = 'blush';
+            break;
+    }
+    expressionTimer = 800;
+
+    showZoneHint(pickRandom(flirtyLines[pressedZone] || flirtyLines.top));
+    spawnParticles(x, y);
+    spawnHearts(x, y);
+}
+
+function handleUp() {
+    if (pressed) {
+        pressed = false;
+        pressedZone = null;
+        targetSquishX = 0;
+        targetSquishY = 0;
+        for (const k in zones) { zones[k].tx = 0; zones[k].ty = 0; }
+        squashWave = 0.15;
+        incrementSquish();
+        setTimeout(() => { faceExpression = 'normal'; }, 500);
+    }
+}
+
+canvas.addEventListener('mousedown', e => handleDown(e.clientX, e.clientY));
+canvas.addEventListener('mouseup', handleUp);
+canvas.addEventListener('mouseleave', handleUp);
+canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const t = e.touches[0];
+    handleDown(t.clientX, t.clientY);
+}, { passive: false });
+canvas.addEventListener('touchend', e => { e.preventDefault(); handleUp(); }, { passive: false });
+canvas.addEventListener('touchcancel', handleUp);
+
+// ==================== PARTICLES + HEARTS ====================
+function spawnParticles(x, y) {
+    if (particles.length > MAX_PARTICLES) return;
+    for (let i = 0; i < 10; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 1.8 + Math.random() * 3.5;
+        particles.push({
+            x, y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 1,
+            size: 3 + Math.random() * 5,
+            life: 1.0,
+            color: `hsl(${330 + Math.random() * 25}, 85%, ${78 + Math.random() * 15}%)`
+        });
+    }
+}
+
+function spawnHearts(x, y) {
+    if (hearts.length > MAX_HEARTS) return;
+    for (let i = 0; i < 3; i++) {
+        hearts.push({
+            x: x + (Math.random() - 0.5) * 40,
+            y,
+            vy: -1.2 - Math.random() * 0.8,
+            vx: (Math.random() - 0.5) * 0.6,
+            size: 12 + Math.random() * 10,
+            life: 1.0,
+            wobble: Math.random() * Math.PI * 2
+        });
+    }
+}
+
+// ==================== HEART ====================
+const heartPath = new Path2D();
+heartPath.moveTo(0, 4);
+heartPath.bezierCurveTo(0, 0, -8, 0, -8, 4);
+heartPath.bezierCurveTo(-8, 8, 0, 12, 0, 16);
+heartPath.bezierCurveTo(0, 12, 8, 8, 8, 4);
+heartPath.bezierCurveTo(8, 0, 0, 0, 0, 4);
+heartPath.closePath();
+
+function drawHeart(x, y, size, color) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(size / 16, size / 16);
+    ctx.fillStyle = color;
+    ctx.fill(heartPath);
+    ctx.restore();
+}
+
+const HEART_COLOR = '#ff5588';
+
+// ==================== MAIN LOOP ====================
+let lastTime = performance.now();
+function loop(now) {
+    const dt = Math.min(50, now - lastTime);
+    lastTime = now;
+    update(dt, now);
+    draw(now);
+    requestAnimationFrame(loop);
+}
+
+// ==================== UPDATE ====================
+function update(dt, now) {
+    updateCenter();
+
+    idlePhase += dt * 0.0025;
+    idleBounce = Math.sin(idlePhase) * 5;
+    idleTilt = Math.sin(idlePhase * 0.5) * 0.015;
+
+    globalSquishX += (targetSquishX - globalSquishX) * EASE_GLOBAL;
+    globalSquishY += (targetSquishY - globalSquishY) * EASE_GLOBAL;
+
+    for (const k in zones) {
+        zones[k].sx += (zones[k].tx - zones[k].sx) * EASE_ZONE;
+        zones[k].sy += (zones[k].ty - zones[k].sy) * EASE_ZONE;
+    }
+
+    squashWave *= 0.88;
+    if (expressionTimer > 0) expressionTimer -= dt;
+
+    eyeBlinkTimer += dt;
+    if (blinkClosing) {
+        if (eyeBlinkTimer > nextBlink) {
+            eyeBlink -= 0.15;
+            if (eyeBlink <= 0) {
+                eyeBlink = 0;
+                blinkClosing = false;
+                eyeBlinkTimer = 0;
+            }
+        }
+    } else {
+        eyeBlink += 0.15;
+        if (eyeBlink >= 1) {
+            eyeBlink = 1;
+            blinkClosing = true;
+            eyeBlinkTimer = 0;
+            nextBlink = 2000 + Math.random() * 4000;
+        }
+    }
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx; p.y += p.vy;
+        p.vy += 0.15;
+        p.vx *= 0.96; p.vy *= 0.98;
+        p.size *= 0.98;
+        p.life -= 0.02;
+        if (p.life <= 0 || p.size < 0.5) particles.splice(i, 1);
+    }
+
+    for (let i = hearts.length - 1; i >= 0; i--) {
+        const h = hearts[i];
+        h.wobble += 0.15;
+        h.x += h.vx + Math.sin(h.wobble) * 0.6;
+        h.y += h.vy;
+        h.vy *= 0.99;
+        h.life -= 0.012;
+        if (h.life <= 0) hearts.splice(i, 1);
+    }
+
+    for (const s of sparkles) {
+        s.y -= s.speed * 0.0015;
+        s.phase += 0.02;
+        if (s.y < -0.05) { s.y = 1.05; s.x = Math.random(); }
+    }
+}
+
+// ==================== DRAW ====================
+function draw(now) {
+    if (bgImageLoaded) {
+        const imgAspect = bgImage.width / bgImage.height;
+        const screenAspect = W / H;
+        let drawW, drawH, drawX, drawY;
+        if (screenAspect > imgAspect) {
+            drawW = W; drawH = W / imgAspect;
+            drawX = 0; drawY = (H - drawH) / 2;
+        } else {
+            drawH = H; drawW = H * imgAspect;
+            drawX = (W - drawW) / 2; drawY = 0;
+        }
+        ctx.drawImage(bgImage, drawX, drawY, drawW, drawH);
+        ctx.save();
+        ctx.globalAlpha = 0.15;
+        ctx.fillStyle = '#ffe4ec';
+        ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+    } else {
+        const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+        bgGrad.addColorStop(0, '#fff5f8');
+        bgGrad.addColorStop(0.5, '#ffe4ec');
+        bgGrad.addColorStop(1, '#ffd0e0');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, W, H);
+    }
+
+    for (const s of sparkles) {
+        const sx = s.x * W, sy = s.y * H;
+        const pulse = 0.5 + 0.5 * Math.sin(s.phase);
+        ctx.globalAlpha = s.alpha * pulse * 0.7;
+        ctx.fillStyle = '#b8f0f6';
+        ctx.beginPath();
+        ctx.arc(sx, sy, s.size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    const idleY = cy + idleBounce;
+    const breathe = 1 + Math.sin(idlePhase * 0.8) * 0.015;
+    const sz = getCurrentSize();
+    const bodyW = BODY_W * sz.scaleX * breathe;
+    const bodyH = BODY_H * sz.scaleY * breathe;
+
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = '#c090a0';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + bodyH * 0.5 + 8, bodyW * 0.4, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(cx, idleY);
+    ctx.rotate(idleTilt);
+
+    const halfW = bodyW / 2;
+    const halfH = bodyH / 2;
+
+    const topY = -halfH + zones.top.sy * 10;
+    const bottomY = halfH + zones.seaweed.sy * 4;
+    const rightBulge = halfW + zones.right.sx * 18;
+    const leftBulge = -halfW + zones.left.sx * 18;
+
+    const bodyPath = new Path2D();
+    bodyPath.moveTo(-halfW * 0.02, topY);
+    bodyPath.bezierCurveTo(halfW * 0.45, topY + bodyH * 0.02, rightBulge * 0.98, halfH * 0.25, rightBulge * 0.96, halfH * 0.55);
+    bodyPath.bezierCurveTo(rightBulge * 0.96, halfH * 0.85, rightBulge * 0.90, bottomY, rightBulge * 0.55, bottomY);
+    bodyPath.quadraticCurveTo(rightBulge * 0.30, bottomY + 6, 0, bottomY + 6);
+    bodyPath.quadraticCurveTo(leftBulge * 0.30, bottomY + 6, leftBulge * 0.55, bottomY);
+    bodyPath.bezierCurveTo(leftBulge * 0.90, bottomY, leftBulge * 0.96, halfH * 0.85, leftBulge * 0.96, halfH * 0.55);
+    bodyPath.bezierCurveTo(leftBulge * 0.98, halfH * 0.25, -halfW * 0.45, topY + bodyH * 0.02, -halfW * 0.02, topY);
+    bodyPath.quadraticCurveTo(halfW * 0.02, topY - 10, halfW * 0.02, topY);
+    bodyPath.closePath();
+
+    const riceGrad = ctx.createRadialGradient(-bodyW * 0.15, -bodyH * 0.25, 20, 0, 0, bodyW * 0.7);
+    riceGrad.addColorStop(0, '#fffdf2');
+    riceGrad.addColorStop(0.6, '#f8f2da');
+    riceGrad.addColorStop(1, '#ecdfc0');
+    ctx.fillStyle = riceGrad;
+    ctx.fill(bodyPath);
+
+    ctx.save();
+    ctx.clip(bodyPath);
+    ctx.fillStyle = 'rgba(200, 185, 140, 0.5)';
+    const specks = [
+        [-halfW * 0.55, -bodyH * 0.25], [ halfW * 0.50, -bodyH * 0.30],
+        [-halfW * 0.42,  bodyH * 0.02], [ halfW * 0.45,  bodyH * 0.05],
+        [-halfW * 0.60, -bodyH * 0.05], [ halfW * 0.28, -bodyH * 0.38],
+        [-halfW * 0.20, -bodyH * 0.42], [ halfW * 0.55,  bodyH * 0.20],
+        [-halfW * 0.32,  bodyH * 0.30]
+    ];
+    for (const [sx, sy] of specks) {
+        ctx.beginPath();
+        ctx.ellipse(sx, sy, 3, 1.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.restore();
+
+    ctx.strokeStyle = '#2a2a2a';
+    ctx.lineWidth = 2.6;
+    ctx.lineJoin = 'round';
+    ctx.stroke(bodyPath);
+
+    const noriW = bodyW * 0.44;
+    const noriTop = bodyH * 0.06 + zones.seaweed.sy * 6;
+    const noriBottom = bottomY - 2;
+    const noriRadius = 10;
+    const noriLeft = -noriW / 2;
+    const noriRight = noriW / 2;
+
+    const noriPath = new Path2D();
+    noriPath.moveTo(noriLeft + noriRadius, noriTop);
+    noriPath.lineTo(noriRight - noriRadius, noriTop);
+    noriPath.quadraticCurveTo(noriRight, noriTop, noriRight, noriTop + noriRadius);
+    noriPath.lineTo(noriRight, noriBottom - noriRadius);
+    noriPath.quadraticCurveTo(noriRight, noriBottom, noriRight - noriRadius, noriBottom);
+    noriPath.lineTo(noriLeft + noriRadius, noriBottom);
+    noriPath.quadraticCurveTo(noriLeft, noriBottom, noriLeft, noriBottom - noriRadius);
+    noriPath.lineTo(noriLeft, noriTop + noriRadius);
+    noriPath.quadraticCurveTo(noriLeft, noriTop, noriLeft + noriRadius, noriTop);
+    noriPath.closePath();
+
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fill(noriPath);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke(noriPath);
+
+    const faceY = -bodyH * 0.10;
+    const eyeOffsetX = bodyW * 0.16;
+    const eyeRadius = 7.5;
+
+    ctx.fillStyle = '#1a1a1a';
+
+    if (faceExpression === 'happy') {
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-eyeOffsetX - 10, faceY + 3);
+        ctx.quadraticCurveTo(-eyeOffsetX, faceY - 7, -eyeOffsetX + 10, faceY + 3);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(eyeOffsetX - 10, faceY + 3);
+        ctx.quadraticCurveTo(eyeOffsetX, faceY - 7, eyeOffsetX + 10, faceY + 3);
+        ctx.stroke();
+    } else if (eyeBlink > 0.3) {
+        let eyeSize = eyeRadius;
+        if (faceExpression === 'surprised') eyeSize = eyeRadius + 2.5;
+
+        ctx.beginPath();
+        ctx.arc(-eyeOffsetX, faceY, eyeSize, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(eyeOffsetX, faceY, eyeSize, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(-eyeOffsetX + 2, faceY - 2, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(eyeOffsetX + 2, faceY - 2, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#1a1a1a';
+    } else {
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.lineWidth = 2.8;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-eyeOffsetX - 7, faceY);
+        ctx.quadraticCurveTo(-eyeOffsetX, faceY - 4, -eyeOffsetX + 7, faceY);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(eyeOffsetX - 7, faceY);
+        ctx.quadraticCurveTo(eyeOffsetX, faceY - 4, eyeOffsetX + 7, faceY);
+        ctx.stroke();
+    }
+
+    const cheekY = faceY + 18;
+    const cheekOffsetX = bodyW * 0.28;
+    const blushIntensity = faceExpression === 'blush' ? 0.95 : 0.7;
+    const blushScale = faceExpression === 'blush' ? 1.35 : 1;
+
+    ctx.globalAlpha = blushIntensity;
+    ctx.fillStyle = '#f5a0b0';
+
+    const blushW = 24 * blushScale * (1 + Math.abs(zones.cheekL.sx));
+    const blushH = 14 * blushScale;
+    ctx.beginPath();
+    ctx.ellipse(-cheekOffsetX, cheekY, blushW, blushH, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const blushW2 = 24 * blushScale * (1 + Math.abs(zones.cheekR.sx));
+    ctx.beginPath();
+    ctx.ellipse(cheekOffsetX, cheekY, blushW2, blushH, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const mouthY = faceY + 8;
+
+    if (faceExpression === 'surprised') {
+        ctx.fillStyle = '#1a1a1a';
+        ctx.beginPath();
+        ctx.ellipse(0, mouthY + 4, 5, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+    } else if (faceExpression === 'blush') {
+        ctx.beginPath();
+        ctx.moveTo(-8, mouthY + 3);
+        ctx.quadraticCurveTo(-4, mouthY + 8, 0, mouthY + 3);
+        ctx.quadraticCurveTo(4, mouthY + 8, 8, mouthY + 3);
+        ctx.stroke();
+    } else {
+        ctx.beginPath();
+        ctx.moveTo(-9, mouthY);
+        ctx.quadraticCurveTo(0, mouthY + 9, 9, mouthY);
+        ctx.stroke();
+    }
+
+    if (faceExpression === 'surprised' && expressionTimer > 0) {
+        ctx.globalAlpha = Math.min(1, expressionTimer / 400);
+        ctx.fillStyle = '#d66090';
+        ctx.font = 'bold 30px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('!', bodyW * 0.45, -bodyH * 0.35);
+        ctx.globalAlpha = 1;
+    }
+
+    ctx.restore();
+
+    for (const p of particles) {
+        ctx.globalAlpha = p.life;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    for (const h of hearts) {
+        ctx.globalAlpha = h.life;
+        drawHeart(h.x, h.y, h.size, HEART_COLOR);
+    }
+    ctx.globalAlpha = 1;
+}
+
+// ==================== INIT ====================
+updateLabels();
+requestAnimationFrame(loop);
+
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    navigator.serviceWorker.register('./sw.js')
+        .catch(error => console.error('Could not register offline support:', error));
+}
+</script>
+
+</body>
+</html>
