@@ -1,0 +1,9 @@
+{
+  "name": "Squishy Simulator — Only for Bea",
+  "short_name": "Squishy",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fff5f8",
+  "theme_color": "#fff5f8"
+}
